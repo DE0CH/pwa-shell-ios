@@ -22,7 +22,7 @@ BUILD=${BUILD_NUMBER:-1}
 
 rm -rf Generated && mkdir -p Generated/Resources
 # xcconfig treats // as a comment: write it as /$()/
-xc() { printf '%s = %s\n' "$1" "${2//\/\//\/\$()\/}"; }
+xc() { printf '%s = %s\n' "$1" "$(printf '%s' "$2" | sed 's#//#/$()/#g')"; }
 {
   xc PWA_SITE_URL "$SITE"
   xc PWA_APP_NAME "$NAME"
