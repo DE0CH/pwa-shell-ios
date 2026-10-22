@@ -129,6 +129,8 @@ struct Conversation: Identifiable, Hashable {
     var id: String
     var title: String
     var lastActivity: Date?
+    /// In Recently deleted: when the server deletes it for good.
+    var purgeAt: Date?
 }
 
 /// An attachment chosen in the composer, before sending.

@@ -27,8 +27,9 @@ struct MainView: View {
                 if let c = deleting { model.delete(c.id) }
                 deleting = nil
             }
+            .accessibilityIdentifier("confirm-delete")
         } message: {
-            Text(L("delete.notice"))
+            Text(L("delete.confirm", deleting?.title ?? "") + "\n" + L("delete.notice"))
         }
     }
 
@@ -104,15 +105,23 @@ struct DeletedList: View {
 
     var body: some View {
         List {
+            Text(L("deleted.hint")).font(.footnote).foregroundStyle(.secondary)
             if model.deletedConversations.isEmpty {
-                Text(L("deleted.empty")).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L("deleted.empty"))
+                    Text(L("deleted.emptyHint")).font(.footnote).foregroundStyle(.secondary)
+                }
             }
             ForEach(model.deletedConversations) { c in
-                HStack {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(c.title.isEmpty ? L("list.unnamed") : c.title).lineLimit(1)
-                    Spacer()
-                    if let d = c.lastActivity { Text(Format.age(d)).font(.caption).foregroundStyle(.secondary) }
+                    if let p = c.purgeAt {
+                        let days = Int(ceil(p.timeIntervalSinceNow / 86400))
+                        Text(days <= 0 ? L("deleted.dueNow") : L("deleted.daysLeft", days)).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("deleted-row")
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) { purging = c } label: { Label(L("deleted.purge"), systemImage: "trash") }
                     Button { model.restore(c.id) } label: { Label(L("deleted.restore"), systemImage: "arrow.uturn.backward") }.tint(.blue)
@@ -126,14 +135,14 @@ struct DeletedList: View {
         .navigationTitle(L("deleted.title"))
         .onAppear { model.loadDeleted() }
         .refreshable { model.loadDeleted() }
-        .confirmationDialog(L("deleted.purge"), isPresented: Binding(get: { purging != nil }, set: { if !$0 { purging = nil } }),
+        .confirmationDialog(L("deleted.purgeTitle"), isPresented: Binding(get: { purging != nil }, set: { if !$0 { purging = nil } }),
                             titleVisibility: .visible) {
             Button(L("deleted.purge"), role: .destructive) {
                 if let c = purging { model.deletePermanently(c.id) }
                 purging = nil
             }
         } message: {
-            Text(L("deleted.purgeNotice"))
+            Text(L("deleted.purgeConfirm", purging?.title ?? "") + "\n" + L("deleted.purgeNotice"))
         }
     }
 }

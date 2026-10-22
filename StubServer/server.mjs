@@ -98,9 +98,12 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, ok({ conversations: list.map((s) => ({ sessionId: s.id, provider: "claude", projectId: "p1",
       projectDisplayName: "Stub", sessionTitle: s.title, lastActivity: s.lastActivity })), total: list.length, hasMore: false }));
   }
-  if (p === "/api/providers/sessions/archived") {
-    return send(res, 200, ok({ sessions: [...sessions.values()].filter((s) => s.deleted).map((s) => ({ sessionId: s.id,
-      provider: "claude", sessionTitle: s.title, lastActivity: s.lastActivity, updatedAt: s.lastActivity })) }));
+  if (p === "/api/providers/sessions/deleted") {
+    return send(res, 200, ok({ retentionDays: 30, sessions: [...sessions.values()].filter((s) => s.deleted).map((s) => {
+      const deletedAt = s.deletedAt || s.lastActivity;
+      return { sessionId: s.id, provider: "claude", sessionTitle: s.title, deletedAt,
+        purgeAt: new Date(Date.parse(deletedAt) + 30 * 86400000).toISOString(), lastActivity: s.lastActivity };
+    }) }));
   }
   if (p === "/api/providers/sessions/running") return send(res, 200, ok({ sessions: [] }));
   if (p === "/api/providers/sessions" && req.method === "POST") {
@@ -116,7 +119,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, ok({ messages: s.messages, total: s.messages.length, hasMore: false, offset: 0, limit: 200 }));
   }
   if ((m = /^\/api\/providers\/sessions\/([^/]+)\/restore$/.exec(p))) {
-    const s = sessions.get(m[1]); s.deleted = false; upserted(s);
+    const s = sessions.get(m[1]); s.deleted = false; s.deletedAt = null; upserted(s);
     return send(res, 200, ok({ sessionId: s.id, isArchived: false }));
   }
   if ((m = /^\/api\/providers\/sessions\/([^/]+)$/.exec(p))) {
@@ -124,8 +127,8 @@ const server = http.createServer(async (req, res) => {
     if (!s) return send(res, 404, { success: false, error: { code: "SESSION_NOT_FOUND", message: "not found" } });
     if (req.method === "PUT") { s.title = JSON.parse((await readBody(req)).toString()).summary; upserted(s); return send(res, 200, ok({ sessionId: s.id, summary: s.title })); }
     if (req.method === "DELETE") {
-      if (u.searchParams.get("force") === "true") sessions.delete(s.id); else s.deleted = true;
-      broadcast({ kind: "session_removed", sessionId: s.id, action: u.searchParams.get("force") ? "deleted" : "archived" });
+      if (u.searchParams.get("force") === "true") sessions.delete(s.id); else { s.deleted = true; s.deletedAt = now(); }
+      broadcast({ kind: "session_removed", sessionId: s.id, action: u.searchParams.get("force") ? "purged" : "deleted" });
       return send(res, 200, ok({ sessionId: s.id, action: "archived" }));
     }
   }

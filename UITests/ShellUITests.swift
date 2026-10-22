@@ -136,4 +136,33 @@ final class ShellUITests: XCTestCase {
         XCUIApplication().terminate()
         test3SendMessageStreamedMarkdownAndFileCard()
     }
+
+    /// Delete moves a conversation to 最近刪除 (with the days left), from where it is restored.
+    func test6DeleteToRecentlyDeletedAndRestore() {
+        let app = launch()
+        XCTAssertTrue(app.staticTexts["empty-greeting"].waitForExistence(timeout: 30))
+        let back = app.navigationBars.buttons["BackButton"].exists ? app.navigationBars.buttons["BackButton"]
+            : app.navigationBars.buttons.element(boundBy: 0)
+        if back.exists { back.tap() }
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS '新聞稿草稿'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.swipeLeft()
+        app.buttons["刪除"].firstMatch.tap()
+        let confirm = app.buttons.matching(NSPredicate(format: "identifier == 'confirm-delete' OR label == '刪除'"))
+        let sheetDelete = confirm.element(boundBy: max(0, confirm.count - 1))
+        XCTAssertTrue(sheetDelete.waitForExistence(timeout: 10))
+        keep("13-delete-confirm")
+        sheetDelete.tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 15), "the deleted conversation stayed in the list")
+        app.buttons.matching(NSPredicate(format: "label CONTAINS '最近刪除'")).firstMatch.tap()
+        let deleted = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'deleted-row' AND label CONTAINS '新聞稿草稿'")).firstMatch
+        XCTAssertTrue(deleted.waitForExistence(timeout: 15), "it is not in Recently deleted")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS '日後永久刪除'")).firstMatch.exists, "no days-left line")
+        keep("14-recently-deleted")
+        deleted.swipeLeft()
+        app.buttons["還原"].firstMatch.tap()
+        XCTAssertTrue(deleted.waitForNonExistence(timeout: 15), "restore did not take it out of Recently deleted")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "the restored conversation is not back in the list")
+    }
 }

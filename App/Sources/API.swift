@@ -84,12 +84,14 @@ final class API: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         return (items, v["hasMore"]?.bool ?? false)
     }
 
+    /// Recently deleted (GET /api/providers/sessions/deleted), most recently deleted first.
     func deleted() async throws -> [Conversation] {
-        let v = try await json(request("/api/providers/sessions/archived"))
+        let v = try await json(request("/api/providers/sessions/deleted"))
         return (v["sessions"]?.array ?? []).compactMap { c in
             guard let id = c["sessionId"]?.string else { return nil }
             return Conversation(id: id, title: c["sessionTitle"]?.string ?? "",
-                                lastActivity: Self.date(c["lastActivity"]?.string ?? c["updatedAt"]?.string))
+                                lastActivity: Self.date(c["deletedAt"]?.string ?? c["lastActivity"]?.string),
+                                purgeAt: Self.date(c["purgeAt"]?.string))
         }
     }
 

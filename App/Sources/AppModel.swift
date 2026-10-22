@@ -310,6 +310,7 @@ final class AppModel {
             guard let id = m.sessionId else { return }
             conversations.removeAll { $0.id == id }
             if selected == id { newChat() }
+            if m.action == "deleted" || m.action == "archived" { loadDeleted() } else { deletedConversations.removeAll { $0.id == id } }
         default:
             break
         }
