@@ -42,5 +42,5 @@ xcrun simctl spawn "$UDID" log show --last 30m --style compact \
   --predicate 'eventMessage CONTAINS "PWAShell" OR (process == "PWAShell" AND messageType == error)' > test-output/app-log.txt 2>&1 || true
 # host classes and error codes only (see ShellViewController.hostClass): safe for a public log
 grep -o "PWAShell .*" test-output/app-log.txt | tail -n 40 || true
-ls -la test-output
+echo "test-output: $(find test-output -type f | wc -l) files (encrypted upload; names can carry the bundle id)"
 exit "$STATUS"
