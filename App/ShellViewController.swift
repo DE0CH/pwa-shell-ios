@@ -86,6 +86,10 @@ final class ShellViewController: UIViewController {
         NotificationCenter.default.addObserver(self, selector: #selector(didBecomeActive),
                                                name: UIApplication.didBecomeActiveNotification, object: nil)
         spinner.startAnimating()
+        // Private detail (the URL): never echoed by CI, which prints only "PWAShell " lines.
+        NSLog("PWAShellPrivate site=%@ raw=%@", Config.siteURL.absoluteString,
+              (Bundle.main.object(forInfoDictionaryKey: "PWASiteURL") as? String) ?? "nil")
+        NSLog("PWAShell start scheme=%@ hasHost=%d", Config.siteURL.scheme ?? "-", Config.siteURL.host == nil ? 0 : 1)
         webView.load(URLRequest(url: Config.siteURL))
     }
 
