@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Take a photo or video to attach.";
+"NSMicrophoneUsageDescription" = "Record sound with a video you attach.";
+"NSPhotoLibraryUsageDescription" = "Choose photos and videos to attach.";
+"NSPhotoLibraryAddUsageDescription" = "Save images you download to your photo library.";

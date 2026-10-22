@@ -1,0 +1,11 @@
+"signin.message" = "Sign in to continue. A Cloudflare Access page opens: sign in with Google or an email code, then tap Approve.";
+"signin.button" = "Sign in";
+"error.title" = "Can't connect";
+"error.message" = "The page didn't load. Check your connection and try again.";
+"error.retry" = "Try again";
+"error.notBehindAccess" = "The sign-in page couldn't be reached. Try again in a moment.";
+"error.timedOut" = "Sign-in took too long. Please try again.";
+"error.badResponse" = "Sign-in didn't complete. Please try again.";
+"download.failed" = "The download failed.";
+"ok" = "OK";
+"cancel" = "Cancel";

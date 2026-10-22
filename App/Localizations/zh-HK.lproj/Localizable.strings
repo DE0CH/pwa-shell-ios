@@ -1,0 +1,11 @@
+"signin.message" = "請先登入。系統會開啟 Cloudflare Access 頁面：用 Google 或電郵驗證碼登入，然後按「Approve」。";
+"signin.button" = "登入";
+"error.title" = "未能連線";
+"error.message" = "頁面未能載入。請檢查網絡連線後再試。";
+"error.retry" = "再試一次";
+"error.notBehindAccess" = "未能開啟登入頁面，請稍後再試。";
+"error.timedOut" = "登入逾時，請再試一次。";
+"error.badResponse" = "登入未能完成，請再試一次。";
+"download.failed" = "下載失敗。";
+"ok" = "確定";
+"cancel" = "取消";

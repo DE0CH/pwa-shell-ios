@@ -1,0 +1,120 @@
+# Builds the app from the repository's secrets (the site, name, bundle id, language, icon: nothing about
+# the instance is in git), tests it on a simulator, then archives it unsigned, cloud-signs it with the App
+# Store Connect API key and uploads it to TestFlight. The upload waits for the simulator test.
+name: iOS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "Upload to TestFlight"
+        type: boolean
+        default: true
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PWA_SITE_URL: ${{ secrets.PWA_SITE_URL }}
+  PWA_APP_NAME: ${{ secrets.PWA_APP_NAME }}
+  PWA_BUNDLE_ID: ${{ secrets.PWA_BUNDLE_ID }}
+  PWA_LANGUAGE: ${{ secrets.PWA_LANGUAGE }}
+  PWA_ICON_PNG_BASE64: ${{ secrets.PWA_ICON_PNG_BASE64 }}
+  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+jobs:
+  simulator:
+    if: github.repository == 'DE0CH/pwa-shell-ios'
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app | grep -v -i beta | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Generate the project
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          scripts/configure.sh
+
+      - name: Simulator test
+        timeout-minutes: 40
+        run: scripts/simulator-test.sh
+
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-screenshots
+          path: |
+            test-output/
+            build/test.log
+          if-no-files-found: ignore
+
+  testflight:
+    needs: simulator
+    if: github.repository == 'DE0CH/pwa-shell-ios' && (github.event_name == 'push' || inputs.upload)
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the configuration
+        run: |
+          missing=0
+          for v in PWA_SITE_URL PWA_APP_NAME PWA_BUNDLE_ID APPLE_TEAM_ID; do
+            [[ -n "${!v}" ]] || { echo "::error::secret $v is not set"; missing=1; }
+          done
+          exit $missing
+
+      - name: Select Xcode 26
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app | grep -v -i beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Generate the project
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          scripts/configure.sh
+
+      - name: Archive (unsigned)
+        # Signing at archive time makes automatic signing mint a new Apple Development certificate on
+        # every fresh runner. The archive stays unsigned; the export signs it with the cloud-managed
+        # distribution certificate.
+        run: |
+          set -o pipefail
+          xcodebuild archive -project PWAShell.xcodeproj -scheme PWAShell -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            2>&1 | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|\*\* " || true
+          grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/archive.log"
+
+      - name: Export, cloud-sign and upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -o pipefail
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_PRIVATE_KEY" > "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -exportOptionsPlist Generated/ExportOptions.plist -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/export.log" | tail -n 30
+          grep -q "EXPORT SUCCEEDED\|Upload succeeded" "$RUNNER_TEMP/export.log"
