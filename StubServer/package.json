@@ -1,0 +1,7 @@
+{
+  "name": "jarvis-stub-server",
+  "private": true,
+  "type": "module",
+  "description": "A recorded stand-in for a Jarvis (DE0CH/claudecodeui staff mode) server, for the app's UI tests",
+  "dependencies": { "ws": "8.18.0" }
+}

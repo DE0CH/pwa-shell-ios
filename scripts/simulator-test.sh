@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Runs the UI tests on an iPhone simulator and copies their screenshots, UI snapshots and the app's log to
+# Runs the UI tests on an iPhone simulator with a Dynamic Island (an iPhone Pro), against the stub server and, for
+# the sign-in test, the real site and copies their screenshots, UI snapshots and the app's log to
 # ./test-output/. These show the configured site and app: CI encrypts them before uploading.
 # Needs a generated project (scripts/configure.sh). Usage: scripts/simulator-test.sh
 set -euo pipefail
@@ -13,6 +14,13 @@ echo "simulator $UDID"
 xcrun simctl boot "$UDID" 2>/dev/null || true
 rm -rf build/test.xcresult test-output
 mkdir -p test-output build
+# the stub server the app tests run against (StubServer/)
+(cd StubServer && npm install --no-audit --no-fund --silent)
+node StubServer/server.mjs 8787 > test-output/stub.log 2>&1 &
+STUB=$!
+trap 'kill $STUB 2>/dev/null || true' EXIT
+for _ in $(seq 1 30); do curl -sf http://127.0.0.1:8787/healthz >/dev/null && break; sleep 1; done
+xcrun simctl addmedia "$UDID" UITests/test-photo.jpg || true
 set +e
 xcodebuild test -project PWAShell.xcodeproj -scheme PWAShell -configuration Debug \
   -destination "id=$UDID" -derivedDataPath build/sim -resultBundlePath build/test.xcresult \

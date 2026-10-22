@@ -3,3 +3,4 @@ Generated/
 build/
 *.xcresult
 .DS_Store
+node_modules/

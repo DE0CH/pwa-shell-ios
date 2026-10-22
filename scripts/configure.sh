@@ -6,6 +6,7 @@
 #   PWA_BUNDLE_ID        bundle id                               default dev.example.pwashell
 #   PWA_LANGUAGE         the app's one UI language (en | zh-HK)  default en
 #   PWA_ICON_PNG_BASE64  1024x1024 opaque PNG, base64            default branding/placeholder-icon.png
+#   PWA_LOGO_PNG_BASE64  the logo on transparent background (sign-in, empty chat), base64; default: the icon
 #   APPLE_TEAM_ID        Apple developer team                    default empty
 #   BUILD_NUMBER         CFBundleVersion                         default 1
 # Prints no input values.
@@ -32,8 +33,8 @@ xc() { printf '%s = %s\n' "$1" "$(printf '%s' "$2" | sed 's#//#/$()/#g')"; }
   xc PWA_BUILD_NUMBER "$BUILD"
 } > Generated/Config.xcconfig
 
-# One language only: iOS then uses it whatever the device language is (the web app decides its own).
-cp -R "App/Localizations/$PWA_LANGUAGE.lproj" Generated/Resources/
+# Both languages; PWA_LANGUAGE is the development region (the fallback).
+cp -R App/Localizations/*.lproj Generated/Resources/
 
 A=Generated/Resources/Assets.xcassets
 mkdir -p "$A/AppIcon.appiconset" "$A/ShellIcon.imageset"
@@ -44,6 +45,11 @@ else
   cp branding/placeholder-icon.png "$A/AppIcon.appiconset/icon-1024.png"
 fi
 cp "$A/AppIcon.appiconset/icon-1024.png" "$A/ShellIcon.imageset/icon.png"
+if [[ -n "${PWA_LOGO_PNG_BASE64:-}" ]]; then
+  mkdir -p "$A/Logo.imageset"
+  printf '%s' "$PWA_LOGO_PNG_BASE64" | base64 --decode > "$A/Logo.imageset/logo.png"
+  printf '{"images":[{"filename":"logo.png","idiom":"universal"}],"info":{"author":"xcode","version":1}}\n' > "$A/Logo.imageset/Contents.json"
+fi
 cat > "$A/AppIcon.appiconset/Contents.json" <<'J'
 {"images":[{"filename":"icon-1024.png","idiom":"universal","platform":"ios","size":"1024x1024"}],"info":{"author":"xcode","version":1}}
 J

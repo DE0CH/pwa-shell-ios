@@ -1,15 +1,15 @@
-# XcodeGen spec. Generate with scripts/configure.sh (it writes Generated/ first), never by hand:
+# XcodeGen spec of a native SwiftUI client for a Jarvis (DE0CH/claudecodeui) server. Generate with scripts/configure.sh (it writes Generated/ first), never by hand:
 # the site, name, bundle id, language and icon are build inputs, not part of the source.
 name: PWAShell
 options:
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "17.0"
   developmentLanguage: ${PWA_LANGUAGE}
   createIntermediateGroups: true
 packages:
-  Sodium:
-    url: https://github.com/jedisct1/swift-sodium
-    exactVersion: 0.11.0
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    exactVersion: 2.4.1
 configFiles:
   Debug: Generated/Config.xcconfig
   Release: Generated/Config.xcconfig
@@ -18,10 +18,7 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: App
-        excludes:
-          - "Localizations/**"
-          - "Info.plist"
+      - path: App/Sources
       - path: Generated/Resources
     settings:
       base:
@@ -37,7 +34,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: $(PWA_TEAM_ID)
     dependencies:
-      - package: Sodium
+      - package: MarkdownUI
+        product: MarkdownUI
   PWAShellUITests:
     type: bundle.ui-testing
     platform: iOS

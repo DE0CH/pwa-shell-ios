@@ -1,4 +1,4 @@
-# Builds the app from the repository's secrets (the site, name, bundle id, language, icon: nothing about
+# Builds the app (a native SwiftUI client of a Jarvis server) from the repository's secrets (the site, name, bundle id, language, icon: nothing about
 # the instance is in git), tests it on a simulator, then archives it unsigned, cloud-signs it with the App
 # Store Connect API key and uploads it to TestFlight. The upload waits for the simulator test.
 # The repository is public, so its logs and artifacts are too: logs never name the site (secrets are masked,
@@ -29,15 +29,20 @@ env:
   PWA_BUNDLE_ID: ${{ secrets.PWA_BUNDLE_ID }}
   PWA_LANGUAGE: ${{ secrets.PWA_LANGUAGE }}
   PWA_ICON_PNG_BASE64: ${{ secrets.PWA_ICON_PNG_BASE64 }}
+  PWA_LOGO_PNG_BASE64: ${{ secrets.PWA_LOGO_PNG_BASE64 }}
   APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
 jobs:
   simulator:
     if: github.repository == 'DE0CH/pwa-shell-ios'
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
       - name: Mask the site's host
         run: |
@@ -58,7 +63,7 @@ jobs:
           scripts/configure.sh
 
       - name: Simulator test
-        timeout-minutes: 40
+        timeout-minutes: 55
         run: scripts/simulator-test.sh
 
       - name: Encrypt the screenshots
