@@ -157,7 +157,7 @@ final class ShellUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label CONTAINS '最近刪除'")).firstMatch.tap()
         let deleted = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'deleted-row' AND label CONTAINS '新聞稿草稿'")).firstMatch
         XCTAssertTrue(deleted.waitForExistence(timeout: 15), "it is not in Recently deleted")
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS '日後永久刪除'")).firstMatch.exists, "no days-left line")
+        XCTAssertTrue(deleted.label.contains("日後永久刪除"), "no days-left line")
         keep("14-recently-deleted")
         deleted.swipeLeft()
         app.buttons["還原"].firstMatch.tap()
