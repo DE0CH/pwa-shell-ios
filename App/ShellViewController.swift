@@ -222,6 +222,8 @@ extension ShellViewController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
                  decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         let response = navigationResponse.response
+        NSLog("PWAShell response main=%d status=%ld host=%@", navigationResponse.isForMainFrame ? 1 : 0,
+              (response as? HTTPURLResponse)?.statusCode ?? -1, Self.hostClass(response.url))
         if navigationResponse.isForMainFrame, let host = response.url?.host?.lowercased(), Config.isAccessHost(host) {
             // Access shows its login page: the session (org token) is gone. Sign in natively.
             decisionHandler(.cancel)
@@ -268,17 +270,31 @@ extension ShellViewController: WKNavigationDelegate {
         spinner.stopAnimating()
         webView.scrollView.refreshControl?.endRefreshing()
         let ns = error as NSError
+        let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError
+        NSLog("PWAShell load error %@ %ld host=%@ underlying=%@ %ld", ns.domain, ns.code,
+              Self.hostClass((ns.userInfo[NSURLErrorFailingURLErrorKey] as? URL)), underlying?.domain ?? "-", underlying?.code ?? 0)
         // Cancelled navigations (our own policy decisions) and "frame load interrupted" (a navigation
         // that became a download) are not failures.
         if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return }
         if ns.domain == "WebKitErrorDomain" && ns.code == 102 { return }
         guard signInView.isHidden else { return }
-        errorView.setMessage(L("error.message") + "\n\n" + ns.localizedDescription)
+        errorView.setMessage(L("error.message") + "\n\n" + ns.localizedDescription + " (\(ns.domain) \(ns.code))")
         errorView.isHidden = false
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         reload()
+    }
+}
+
+extension ShellViewController {
+    /// For logs: which kind of host, never the host itself (CI logs of this public repo must not name the site).
+    static func hostClass(_ url: URL?) -> String {
+        guard let url else { return "-" }
+        guard let host = url.host?.lowercased() else { return url.scheme ?? "-" }
+        if host == Config.siteHost { return "site" }
+        if Config.isAccessHost(host) { return "access" }
+        return "other"
     }
 }
 

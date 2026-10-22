@@ -15,13 +15,15 @@ final class ShellUITests: XCTestCase {
         add(shot)
     }
 
-    /// The shell shows an ordinary page full screen (example.com, not the configured site).
+    /// The shell shows a page full screen (a local test page, not the configured site).
     func testShellLoadsAPage() {
         let app = XCUIApplication()
-        app.launchArguments = ["-PWASiteURLOverride", "https://example.com/"]
+        let page = "<meta name=viewport content='width=device-width,viewport-fit=cover'><h1>Shell test page</h1>"
+        app.launchArguments = ["-PWASiteURLOverride",
+                               "data:text/html," + page.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!]
         app.launch()
-        let heading = app.webViews.staticTexts["Example Domain"]
-        XCTAssertTrue(heading.waitForExistence(timeout: 60), "example.com did not render in the web view")
+        let heading = app.webViews.staticTexts["Shell test page"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 60), "the test page did not render in the web view")
         keep("01-shell-example-page")
     }
 

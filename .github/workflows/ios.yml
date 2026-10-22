@@ -1,6 +1,9 @@
 # Builds the app from the repository's secrets (the site, name, bundle id, language, icon: nothing about
 # the instance is in git), tests it on a simulator, then archives it unsigned, cloud-signs it with the App
 # Store Connect API key and uploads it to TestFlight. The upload waits for the simulator test.
+# The repository is public, so its logs and artifacts are too: logs never name the site (secrets are masked,
+# the app logs host classes only) and the simulator screenshots are age-encrypted to the recipient in the
+# secret PWA_ARTIFACT_AGE_RECIPIENT before upload.
 name: iOS
 
 on:
@@ -36,6 +39,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Mask the site's host
+        run: |
+          h=${PWA_SITE_URL#https://}; h=${h%%/*}
+          [[ -n "$h" ]] && echo "::add-mask::$h"
+          true
+
       - name: Select Xcode 26
         run: |
           XCODE=$(ls -d /Applications/Xcode_26*.app | grep -v -i beta | sort -V | tail -1)
@@ -52,14 +61,23 @@ jobs:
         timeout-minutes: 40
         run: scripts/simulator-test.sh
 
-      - name: Keep the screenshots
+      - name: Encrypt the screenshots
+        if: always()
+        env:
+          PWA_ARTIFACT_AGE_RECIPIENT: ${{ secrets.PWA_ARTIFACT_AGE_RECIPIENT }}
+        run: |
+          rm -f simulator-results.tar.age
+          [[ -n "$PWA_ARTIFACT_AGE_RECIPIENT" ]] || { echo "no PWA_ARTIFACT_AGE_RECIPIENT: screenshots not kept"; exit 0; }
+          brew list age >/dev/null 2>&1 || brew install age
+          tar -czf - test-output build/test.log 2>/dev/null | age -r "$PWA_ARTIFACT_AGE_RECIPIENT" > simulator-results.tar.age
+          ls -la simulator-results.tar.age
+
+      - name: Keep the encrypted screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: simulator-screenshots
-          path: |
-            test-output/
-            build/test.log
+          name: simulator-results-encrypted
+          path: simulator-results.tar.age
           if-no-files-found: ignore
 
   testflight:
@@ -77,6 +95,12 @@ jobs:
             [[ -n "${!v}" ]] || { echo "::error::secret $v is not set"; missing=1; }
           done
           exit $missing
+
+      - name: Mask the site's host
+        run: |
+          h=${PWA_SITE_URL#https://}; h=${h%%/*}
+          [[ -n "$h" ]] && echo "::add-mask::$h"
+          true
 
       - name: Select Xcode 26
         run: |

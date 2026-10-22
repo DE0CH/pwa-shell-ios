@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Runs the UI tests on an iPhone simulator and copies their screenshots to ./test-output/.
+# Runs the UI tests on an iPhone simulator and copies their screenshots, UI snapshots and the app's log to
+# ./test-output/. These show the configured site and app: CI encrypts them before uploading.
 # Needs a generated project (scripts/configure.sh). Usage: scripts/simulator-test.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -33,12 +34,13 @@ for test in m:
         if name.startswith("Debug description"):
             os.remove(src)
             continue
-        if name.startswith("App UI hierarchy"):
-            print("==== " + test.get("testIdentifier", "") + ": " + name)
-            print(open(src, errors="replace").read()[:4000])
         name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
         os.rename(src, os.path.join("test-output", name))
 P
 fi
+xcrun simctl spawn "$UDID" log show --last 30m --style compact \
+  --predicate 'eventMessage CONTAINS "PWAShell" OR (process == "PWAShell" AND messageType == error)' > test-output/app-log.txt 2>&1 || true
+# host classes and error codes only (see ShellViewController.hostClass): safe for a public log
+grep -o "PWAShell .*" test-output/app-log.txt | tail -n 40 || true
 ls -la test-output
 exit "$STATUS"

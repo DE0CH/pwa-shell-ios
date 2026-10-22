@@ -36,6 +36,7 @@ language and icon are build inputs, set as GitHub secrets and written into the p
 | `PWA_ICON_PNG_BASE64` | the app icon: an opaque 1024×1024 PNG, base64 (optional; a placeholder otherwise) |
 | `APPLE_TEAM_ID` | Apple developer team id |
 | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY` | App Store Connect API key (Admin: cloud signing), `.p8` text |
+| `PWA_ARTIFACT_AGE_RECIPIENT` | an [age](https://age-encryption.org) public key: the simulator screenshots show the site, and this repository's artifacts are public, so CI uploads them encrypted to it (optional; without it nothing is uploaded) |
 
 ## Shipping a build
 
@@ -43,7 +44,9 @@ Every push to `main` (or **Actions → iOS → Run workflow**) runs `.github/wor
 
 1. **simulator**: generates the project (XcodeGen), runs the UI tests on an iPhone simulator
    (`scripts/simulator-test.sh`): the shell renders a page, the configured site brings up the sign-in screen,
-   and its button opens the Access login sheet. Screenshots are the `simulator-screenshots` artifact.
+   and its button opens the Access login sheet. Screenshots, UI snapshots and the app's log are the
+   `simulator-results-encrypted` artifact (`age -d -i KEY simulator-results.tar.age | tar -xz`). The public
+   log names no host: secrets are masked and the app logs only `site` / `access` / `other`.
 2. **testflight** (after the simulator job passes): archives unsigned, then `xcodebuild -exportArchive`
    cloud-signs with the API key and uploads to App Store Connect. The build number is
    `<run number>.<run attempt>`. TestFlight processing takes a few minutes after the upload.
