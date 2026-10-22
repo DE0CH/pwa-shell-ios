@@ -7,7 +7,19 @@ struct ShellApp: App {
     var body: some Scene {
         WindowGroup {
             RootView().environment(model)
+                .preferredColorScheme(Self.testScheme)
         }
+    }
+}
+
+extension ShellApp {
+    /// UI tests' dark-mode screenshots (Debug builds only): `-PWAColorScheme dark`.
+    static var testScheme: ColorScheme? {
+        #if DEBUG
+        return UserDefaults.standard.string(forKey: "PWAColorScheme") == "dark" ? .dark : nil
+        #else
+        return nil
+        #endif
     }
 }
 

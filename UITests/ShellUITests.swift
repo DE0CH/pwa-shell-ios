@@ -9,11 +9,6 @@ final class ShellUITests: XCTestCase {
 
     override func setUp() {
         continueAfterFailure = false
-        XCUIDevice.shared.appearance = .light
-    }
-
-    override func tearDown() {
-        XCUIDevice.shared.appearance = .light
     }
 
     private func keep(_ name: String) {
@@ -23,18 +18,14 @@ final class ShellUITests: XCTestCase {
         add(shot)
     }
 
-    private func both(_ name: String, settle: TimeInterval = 1) {
-        keep(name + "-light")
-        XCUIDevice.shared.appearance = .dark
-        Thread.sleep(forTimeInterval: settle)
-        keep(name + "-dark")
-        XCUIDevice.shared.appearance = .light
-        Thread.sleep(forTimeInterval: settle)
-    }
+    /// Light screenshots in the flow tests; test5DarkMode walks the same screens in dark mode.
+    private func both(_ name: String) { keep(name + (dark ? "-dark" : "-light")) }
+    private var dark = false
 
     private func launch(stubbed: Bool = true) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(zh-HK)", "-AppleLocale", "zh_HK"]
+        if dark { app.launchArguments += ["-PWAColorScheme", "dark"] }
         if stubbed { app.launchArguments += ["-PWASiteURLOverride", stub, "-PWATestToken", "stub-token"] }
         app.launch()
         return app
@@ -100,8 +91,12 @@ final class ShellUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["46.1"].waitForExistence(timeout: 10), "the table did not render")
         let card = app.buttons["file-card"]
         XCTAssertTrue(card.waitForExistence(timeout: 20), "the file card did not appear")
+        // keyboard away for the screenshot
+        let transcript = app.scrollViews["transcript"]
+        if transcript.exists { transcript.swipeDown() } else if app.scrollViews.firstMatch.exists { app.scrollViews.firstMatch.swipeDown() }
         Thread.sleep(forTimeInterval: 2)
         both("08-reply-markdown-file-card")
+        if dark { return }
         card.tap()
         Thread.sleep(forTimeInterval: 4)
         keep("09-file-quick-look")
@@ -118,7 +113,7 @@ final class ShellUITests: XCTestCase {
         let image = app.images.matching(NSPredicate(format: "label CONTAINS[c] 'photo' OR label CONTAINS '相片' OR label CONTAINS '照片'")).firstMatch
         XCTAssertTrue(image.waitForExistence(timeout: 30), "the photo picker showed no photo")
         keep("10-photo-picker")
-        image.tap()
+        image.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let add = button(app, labels: ["Add", "加入", "新增", "完成", "Done"])
         if add.waitForExistence(timeout: 5) { add.tap() }
         XCTAssertTrue(app.otherElements["pending-attachment"].waitForExistence(timeout: 20)
@@ -133,5 +128,12 @@ final class ShellUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["第三季摘要"].waitForExistence(timeout: 40))
         Thread.sleep(forTimeInterval: 1)
         keep("12-sent-photo")
+    }
+
+    func test5DarkMode() {
+        dark = true
+        test2EmptyChatAndList()
+        XCUIApplication().terminate()
+        test3SendMessageStreamedMarkdownAndFileCard()
     }
 }
