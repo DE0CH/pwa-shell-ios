@@ -11,7 +11,7 @@ print((pro or devs)[-1]["udid"])')
 echo "simulator $UDID"
 xcrun simctl boot "$UDID" 2>/dev/null || true
 rm -rf build/test.xcresult test-output
-mkdir -p test-output
+mkdir -p test-output build
 set +e
 xcodebuild test -project PWAShell.xcodeproj -scheme PWAShell -configuration Debug \
   -destination "id=$UDID" -derivedDataPath build/sim -resultBundlePath build/test.xcresult \
@@ -22,14 +22,22 @@ xcrun xcresulttool export attachments --path build/test.xcresult --output-path t
 # name the files after their attachment names
 if [[ -f test-output/manifest.json ]]; then
   python3 - <<'P'
-import json, os
+import json, os, re
 m = json.load(open("test-output/manifest.json"))
 for test in m:
     for a in test.get("attachments", []):
         src = os.path.join("test-output", a["exportedFileName"])
         name = a.get("suggestedHumanReadableName") or a["exportedFileName"]
-        if os.path.exists(src):
-            os.rename(src, os.path.join("test-output", name.replace("/", "_")))
+        if not os.path.exists(src):
+            continue
+        if name.startswith("Debug description"):
+            os.remove(src)
+            continue
+        if name.startswith("App UI hierarchy"):
+            print("==== " + test.get("testIdentifier", "") + ": " + name)
+            print(open(src, errors="replace").read()[:4000])
+        name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
+        os.rename(src, os.path.join("test-output", name))
 P
 fi
 ls -la test-output
