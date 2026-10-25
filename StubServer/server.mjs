@@ -1,7 +1,9 @@
 // A stand-in for a Jarvis server (DE0CH/claudecodeui in staff mode) for the iOS app's UI tests: the same REST shapes
 // and WebSocket frames (server/shared/types.ts NormalizedMessage), with canned conversations and a canned reply
 // (preparing → ready → tool steps → Markdown with a table and code → a SendUserFile card → complete).
-// Usage: node server.mjs [port]   (token: Cookie CF_Authorization=stub-token)
+// It also stands in for Jarvis 4 (DE0CH/jarvis4 router: GET /api/remotes?harness=cloudcli, POST /api/sessions/:id/start)
+// and a session's CloudCLI server in local mode (GET /api/jarvis/main), all on the same origin.
+// Usage: node server.mjs [port]   (token: Cookie CF_Authorization=stub-token, or CF-Access-Client-Secret: stub-token)
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
@@ -50,6 +52,13 @@ seed("新聞稿草稿", 180);
 const del = seed("舊對話", 60 * 50);
 sessions.get(del).deleted = true;
 
+// Jarvis 4: two cloudcli sessions; the running one's main conversation is "Meeting notes"
+const jarvisSessions = [
+  { id: "sess-running-0001", title: "Release notes", state: "started", model: "cloudcli/claude-opus-5-5", harness: "cloudcli" },
+  { id: "sess-paused-00002", title: "Paused research", state: "paused", model: "cloudcli/claude-opus-5-5", harness: "cloudcli" },
+];
+const mainConversation = [...sessions.values()].find((s) => s.title === "Meeting notes").id;
+
 const sockets = new Set();
 const broadcast = (o) => { for (const s of sockets) s.send(JSON.stringify(o)); };
 const upserted = (s) => broadcast({ kind: "session_upserted", sessionId: s.id, provider: "claude",
@@ -63,7 +72,8 @@ function send(res, status, body, headers = {}) {
   res.end(isBuf ? body : JSON.stringify(body));
 }
 const ok = (data) => ({ success: true, data });
-const authed = (req) => (req.headers.cookie || "").includes(`CF_Authorization=${TOKEN}`);
+const authed = (req) => (req.headers.cookie || "").includes(`CF_Authorization=${TOKEN}`)
+  || req.headers["cf-access-client-secret"] === TOKEN;
 const readBody = (req) => new Promise((r) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => r(Buffer.concat(c))); });
 
 function parseMultipart(buf, boundary) {
@@ -92,6 +102,20 @@ const server = http.createServer(async (req, res) => {
   if (!authed(req)) return send(res, 401, "<html>未登入</html>", { "content-type": "text/html" });
   let m;
   if (p === "/api/jarvis/me") return send(res, 200, { firstName: "Chris" });
+  if (p === "/api/remotes") {
+    const base = `http://127.0.0.1:${PORT}/`;
+    return send(res, 200, { sessions: jarvisSessions.map((s) => s.state === "started" ? { ...s, webUrl: base } : { ...s }) });
+  }
+  if ((m = /^\/api\/sessions\/([^/]+)\/start$/.exec(p)) && req.method === "POST") {
+    const s = jarvisSessions.find((x) => x.id === m[1]);
+    if (!s) return send(res, 404, { error: "no such session" });
+    setTimeout(() => { s.state = "started"; }, 3000);
+    return send(res, 202, { ok: true });
+  }
+  if (p === "/api/jarvis/main") {
+    const s = sessions.get(mainConversation);
+    return send(res, 200, { sessionId: s.id, providerSessionId: null, title: s.title, status: "idle" });
+  }
   if (p === "/api/jarvis/warm") return send(res, 202, { ok: true });
   if (p === "/api/providers/sessions/recent") {
     const list = [...sessions.values()].filter((s) => !s.deleted).sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));

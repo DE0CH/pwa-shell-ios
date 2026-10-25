@@ -11,10 +11,18 @@ enum Config {
         return URL(string: s) ?? URL(string: "https://example.com/")!
     }()
 
+    /// The kind of server (build input PWA_BACKEND): `server` (one CloudCLI-fork server) or `jarvis4` (Backend.swift).
+    static let backend: String = {
+        #if DEBUG
+        if let o = UserDefaults.standard.string(forKey: "PWABackendOverride") { return o }
+        #endif
+        return Bundle.main.object(forInfoDictionaryKey: "PWABackend") as? String ?? "server"
+    }()
+
     /// The server's sign-in endpoint (DE0CH/claudecodeui jarvis/router.mjs).
     static let signInPath = "api/jarvis/app-signin"
 
-    /// The sign-in callback scheme: the bundle id (the server's JARVIS_APP_SCHEME).
+    /// The sign-in callback scheme: the bundle id (the server's JARVIS_APP_SCHEME; Jarvis 4's pairing scheme).
     static var signInScheme: String { Bundle.main.bundleIdentifier ?? "pwashell" }
 
     static var appName: String {

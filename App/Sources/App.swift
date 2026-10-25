@@ -27,7 +27,7 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if model.token == nil { SignInView() } else { MainView() }
+        if model.signedIn { MainView() } else { SignInView() }
     }
 }
 
@@ -50,7 +50,7 @@ struct SignInView: View {
             Spacer()
             LogoImage(size: 88)
             Text(Config.appName).font(.largeTitle.bold())
-            Text(L("signin.message")).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text(L(Config.backend == "jarvis4" ? "signin.messagePair" : "signin.message")).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
             if let e = model.signInError { Text(e).font(.callout).foregroundStyle(.red).multilineTextAlignment(.center) }
             Button {
                 model.startSignIn()

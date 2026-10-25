@@ -1,11 +1,14 @@
 import XCTest
 
 /// Simulator tests, run in CI (scripts/simulator-test.sh): the sign-in path against the real server up to Access's
-/// Google button, then the app against the stub server (StubServer/, http://127.0.0.1:8787): the empty chat, the
+/// login, then the app against the stub server (StubServer/, http://127.0.0.1:8787): the empty chat, the
 /// conversation list, a sent message with a streamed Markdown reply and a file card, and a photo attachment.
-/// Screenshots (light and dark) are kept as attachments.
+/// Screenshots (light and dark) are kept as attachments. The build's backend (TEST_RUNNER_PWA_BACKEND) picks the
+/// variant: `server` (YYC AI's kind: New chat, delete and restore) or `jarvis4` (pairing, a list of sessions, one
+/// conversation each, resuming a paused one).
 final class ShellUITests: XCTestCase {
     let stub = "http://127.0.0.1:8787"
+    let jarvis4 = ProcessInfo.processInfo.environment["PWA_BACKEND"] == "jarvis4"
 
     override func setUp() {
         continueAfterFailure = false
@@ -35,7 +38,17 @@ final class ShellUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label IN %@", labels)).firstMatch
     }
 
-    /// The real server's sign-in: the app's screen, iOS's consent, then Access's own login with its Google button.
+    /// Jarvis 4: back to the session list (the app opens on it) and into the running session.
+    private func openRunningSession(_ app: XCUIApplication) {
+        guard jarvis4 else { return }
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Release notes'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "the session list did not load")
+        row.tap()
+        XCTAssertTrue(app.staticTexts["Decisions"].waitForExistence(timeout: 15), "the session's conversation did not load")
+    }
+
+    /// The real server's sign-in: the app's screen, iOS's consent, then Access's own login (YYC AI: its Google button;
+    /// Jarvis 4's pairing: Access's login page).
     func test1SignInReachesAccessGoogleButton() {
         let app = launch(stubbed: false)
         let signIn = app.buttons["signin-button"]
@@ -50,14 +63,35 @@ final class ShellUITests: XCTestCase {
         }
         let sheet = XCUIApplication(bundleIdentifier: "com.apple.SafariViewService")
         let google = NSPredicate(format: "label CONTAINS 'Google'")
-        let found = sheet.buttons.matching(google).firstMatch.waitForExistence(timeout: 45)
-            || sheet.links.matching(google).firstMatch.exists || app.buttons.matching(google).firstMatch.exists
+        var found: Bool
+        if jarvis4 {
+            // Deyao's Access login: an emailed code (an email field) or an identity provider's button
+            found = sheet.textFields.firstMatch.waitForExistence(timeout: 45) || sheet.buttons.matching(google).firstMatch.exists
+                || sheet.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Cloudflare' OR label CONTAINS[c] 'email'")).firstMatch.exists
+        } else {
+            found = sheet.buttons.matching(google).firstMatch.waitForExistence(timeout: 45)
+                || sheet.links.matching(google).firstMatch.exists || app.buttons.matching(google).firstMatch.exists
+        }
         keep("03-access-login")
-        XCTAssertTrue(found, "Access's login with the Google button did not open")
+        XCTAssertTrue(found, "Access's login did not open")
     }
 
     func test2EmptyChatAndList() {
         let app = launch()
+        if jarvis4 {
+            // the session list first (no New chat); a paused session says so
+            let paused = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Paused research'")).firstMatch
+            XCTAssertTrue(paused.waitForExistence(timeout: 30), "the session list did not load")
+            XCTAssertFalse(app.buttons["sidebar-new-chat"].exists, "Jarvis 4 has no New chat")
+            XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS '最近刪除'")).firstMatch.exists)
+            both("05-session-list")
+            openRunningSession(app)
+            XCTAssertTrue(app.textViews["composer-input"].exists || app.textFields["composer-input"].exists, "no composer")
+            XCTAssertFalse(app.buttons["share-button"].exists, "Jarvis 4 has no share links")
+            XCTAssertTrue(app.buttons["files-button"].exists, "no Files button")
+            both("06-history")
+            return
+        }
         let greeting = app.staticTexts["empty-greeting"]
         XCTAssertTrue(greeting.waitForExistence(timeout: 30), "the empty chat did not appear")
         XCTAssertTrue(app.textViews["composer-input"].exists || app.textFields["composer-input"].exists, "no composer")
@@ -77,6 +111,7 @@ final class ShellUITests: XCTestCase {
 
     func test3SendMessageStreamedMarkdownAndFileCard() {
         let app = launch()
+        openRunningSession(app)
         let input = app.textViews["composer-input"].exists ? app.textViews["composer-input"] : app.textFields["composer-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 30))
         input.tap()
@@ -104,6 +139,7 @@ final class ShellUITests: XCTestCase {
 
     func test4AttachPhoto() {
         let app = launch()
+        openRunningSession(app)
         let attach = app.buttons["attach-button"]
         XCTAssertTrue(attach.waitForExistence(timeout: 30))
         attach.tap()
@@ -137,9 +173,23 @@ final class ShellUITests: XCTestCase {
         test3SendMessageStreamedMarkdownAndFileCard()
     }
 
-    /// Delete moves a conversation to 最近刪除 (with the days left), from where it is restored.
+    /// Delete moves a conversation to 最近刪除 (with the days left), from where it is restored. Jarvis 4 instead: a
+    /// paused session opens on Resume, and comes back running.
     func test6DeleteToRecentlyDeletedAndRestore() {
         let app = launch()
+        if jarvis4 {
+            let paused = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Paused research'")).firstMatch
+            XCTAssertTrue(paused.waitForExistence(timeout: 30), "the session list did not load")
+            paused.tap()
+            let resume = app.buttons["resume-button"]
+            XCTAssertTrue(resume.waitForExistence(timeout: 15), "a paused session did not offer Resume")
+            XCTAssertFalse(app.textViews["composer-input"].exists || app.textFields["composer-input"].exists, "a paused session has no composer")
+            keep("13-paused-session")
+            resume.tap()
+            XCTAssertTrue(app.staticTexts["Decisions"].waitForExistence(timeout: 40), "the resumed session's conversation did not load")
+            keep("14-resumed-session")
+            return
+        }
         XCTAssertTrue(app.staticTexts["empty-greeting"].waitForExistence(timeout: 30))
         let back = app.navigationBars.buttons["BackButton"].exists ? app.navigationBars.buttons["BackButton"]
             : app.navigationBars.buttons.element(boundBy: 0)

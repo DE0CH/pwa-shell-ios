@@ -22,7 +22,8 @@ trap 'kill $STUB 2>/dev/null || true' EXIT
 for _ in $(seq 1 30); do curl -sf http://127.0.0.1:8787/healthz >/dev/null && break; sleep 1; done
 xcrun simctl addmedia "$UDID" UITests/test-photo.jpg || true
 set +e
-xcodebuild test -project PWAShell.xcodeproj -scheme PWAShell -configuration Debug \
+# the tests pick their variant from the build's backend (TEST_RUNNER_* reaches the test runner without the prefix)
+TEST_RUNNER_PWA_BACKEND="${PWA_BACKEND:-server}" xcodebuild test -project PWAShell.xcodeproj -scheme PWAShell -configuration Debug \
   -destination "id=$UDID" -derivedDataPath build/sim -resultBundlePath build/test.xcresult \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= 2>&1 | tee build/test.log | grep -E "error:|Test Case|\*\* TEST|XCTAssert" 
 STATUS=${PIPESTATUS[0]}

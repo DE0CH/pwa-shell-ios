@@ -8,6 +8,22 @@ WebSocket the web UI uses. (The repository started as a web-view shell, hence it
 Nothing about any particular instance is in this repository: its URL, the app's name, bundle id, language, icon and
 logo are build inputs, set as GitHub secrets and written into the project at build time by `scripts/configure.sh`.
 
+## One UI, a backend per kind of server
+
+Every screen is shared; `App/Sources/Backend.swift` decides only how the app signs in, where the conversation list
+comes from and which server each conversation is on (build input `PWA_BACKEND`):
+
+- **`server`** (default): one CloudCLI-fork server with its own conversation list (e.g. YYC AI). Everything below.
+- **`jarvis4`**: [Jarvis 4](https://github.com/DE0CH/jarvis4), whose `cloudcli` sessions each run the same fork on
+  their own origin. The app pairs once with Jarvis 4 (`/api/devices/pair?app=jarvis4chat`, the person's Access login
+  in the system sheet; the answer carries an Access service token for this device, kept in the Keychain), lists the
+  sessions (`/api/remotes?harness=cloudcli`) and talks to each session's server with that token. A session is one
+  conversation (`/api/jarvis/main`), so there is no New chat, rename, delete or share; a paused session offers Resume
+  (`POST /api/sessions/:id/start`).
+
+Each app built from this code is a GitHub environment of this repository, and every push builds, tests and uploads
+all of them: `yyc-ai` (the repository's own secrets) and `jarvis4-chat` (its environment's secrets override them).
+
 ## What the app does
 
 - **Sign-in.** The app opens `https://<site>/api/jarvis/app-signin?state=<random>` in `ASWebAuthenticationSession`.
@@ -40,6 +56,8 @@ logo are build inputs, set as GitHub secrets and written into the project at bui
 | `PWA_LANGUAGE` | development region / fallback language: `zh-HK` or `en` |
 | `PWA_ICON_PNG_BASE64` | app icon: an opaque 1024×1024 PNG, base64 (optional; a placeholder otherwise) |
 | `PWA_LOGO_PNG_BASE64` | logo on a transparent background for the sign-in and empty chat, base64 (optional) |
+| `PWA_ICON_PNG_BASE64_2`, `PWA_LOGO_PNG_BASE64_2` | the rest of a base64 value longer than a secret holds (48 KB), appended |
+| `PWA_BACKEND` | the kind of server: `server` (default: one CloudCLI-fork server, e.g. YYC AI) or `jarvis4` (see below) |
 | `APPLE_TEAM_ID` | Apple developer team id |
 | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY` | App Store Connect API key (Admin: cloud signing), `.p8` text |
 | `PWA_ARTIFACT_AGE_RECIPIENT` | an [age](https://age-encryption.org) public key: CI's screenshots show the site, and this repository's artifacts are public, so they are uploaded encrypted to it |
@@ -50,9 +68,10 @@ Every push to `main` runs `.github/workflows/ios.yml`:
 
 1. **simulator** (`scripts/simulator-test.sh`): UI tests on an iPhone Pro simulator (Dynamic Island):
    - the real server's sign-in path up to Access's Google button;
-   - against `StubServer/` (a recorded stand-in for the server's REST API and WebSocket frames): the empty chat,
-     the conversation list and a history, sending a message with a streamed Markdown reply (table, code) and a file
-     card opening in Quick Look, attaching a photo; light and dark.
+   - against `StubServer/` (a recorded stand-in for the server's REST API and WebSocket frames, and for Jarvis 4's):
+     the empty chat, the conversation list and a history, sending a message with a streamed Markdown reply (table,
+     code) and a file card opening in Quick Look, attaching a photo; light and dark; delete and restore (`server`),
+     the session list and resuming a paused session (`jarvis4`).
    Screenshots, UI snapshots, the app's and the stub's logs are the `simulator-results-encrypted` artifact
    (`age -d -i KEY simulator-results.tar.age | tar -xz`). The public log names no host.
 2. **testflight** (after the tests pass): archives unsigned, then `xcodebuild -exportArchive` cloud-signs with the

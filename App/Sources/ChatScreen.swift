@@ -23,7 +23,9 @@ struct ChatScreen: View {
                 }
                 .padding(8).background(.red.opacity(0.15))
             }
-            if model.rows.isEmpty && !model.loadingHistory {
+            if model.current?.paused == true {
+                PausedSession()
+            } else if model.rows.isEmpty && !model.loadingHistory {
                 EmptyChat()
             } else {
                 transcript
@@ -32,7 +34,7 @@ struct ChatScreen: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 6) {
                 if model.isBusy { ActivityIndicator() }
-                Composer()
+                if model.canCompose { Composer() }
             }
             .padding(.horizontal, 12).padding(.bottom, 6).padding(.top, 4)
             .background(.bar)
@@ -41,14 +43,18 @@ struct ChatScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if model.selected != nil {
-                    Button { showShare = true } label: { Image(systemName: "square.and.arrow.up") }
-                        .accessibilityLabel(L("share.button")).accessibilityIdentifier("share-button")
+                if model.chatId != nil {
+                    if model.features.share {
+                        Button { showShare = true } label: { Image(systemName: "square.and.arrow.up") }
+                            .accessibilityLabel(L("share.button")).accessibilityIdentifier("share-button")
+                    }
                     Button { showFiles = true } label: { Image(systemName: "folder") }
                         .accessibilityLabel(L("files.title")).accessibilityIdentifier("files-button")
                 }
-                Button { model.newChat() } label: { Image(systemName: "square.and.pencil") }
-                    .accessibilityLabel(L("chat.new")).accessibilityIdentifier("new-chat-button")
+                if model.features.newChat {
+                    Button { model.newChat() } label: { Image(systemName: "square.and.pencil") }
+                        .accessibilityLabel(L("chat.new")).accessibilityIdentifier("new-chat-button")
+                }
             }
         }
         .sheet(isPresented: $showFiles) { FilesPanel() }
@@ -102,6 +108,31 @@ struct EmptyChat: View {
         }
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Jarvis 4: the open session is paused (its machine is stopped); Resume starts it again.
+struct PausedSession: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "pause.circle").font(.system(size: 48)).foregroundStyle(.secondary)
+            Text(L("session.paused")).font(.title3.weight(.semibold))
+            Text(L("session.pausedHint")).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button {
+                model.resume()
+            } label: {
+                if model.resuming { Label(L("session.resuming"), systemImage: "hourglass") } else { Text(L("session.resume")) }
+            }
+            .buttonStyle(.borderedProminent).controlSize(.large)
+            .disabled(model.resuming)
+            .accessibilityIdentifier("resume-button")
+            Spacer()
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -219,7 +250,7 @@ struct SentFilesView: View {
             ForEach(files) { f in
                 Button { openFile.open(f.path, f.name) } label: {
                     HStack(spacing: 12) {
-                        if isImage(f.name), let id = model.selected, let api = model.api {
+                        if isImage(f.name), let id = model.chatId, let api = model.api {
                             AuthImage(path: api.rawPath(id, f.path, inline: true)).frame(width: 56, height: 56)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                         } else {

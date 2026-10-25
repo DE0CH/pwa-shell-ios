@@ -1,6 +1,9 @@
 # Builds the app (a native SwiftUI client of a Jarvis server) from the repository's secrets (the site, name, bundle id, language, icon: nothing about
 # the instance is in git), tests it on a simulator, then archives it unsigned, cloud-signs it with the App
 # Store Connect API key and uploads it to TestFlight. The upload waits for the simulator test.
+# Every app built from this code is a GitHub environment, so one push ships all of them, each on its own (one app's
+# failing test doesn't hold back another's upload): `yyc-ai` (the repository's own secrets) and `jarvis4-chat` (its
+# environment's PWA_* secrets override them; PWA_BACKEND jarvis4).
 # The repository is public, so its logs and artifacts are too: logs never name the site (secrets are masked,
 # the app logs host classes only) and the simulator screenshots are age-encrypted to the recipient in the
 # secret PWA_ARTIFACT_AGE_RECIPIENT before upload.
@@ -23,26 +26,42 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  PWA_SITE_URL: ${{ secrets.PWA_SITE_URL }}
-  PWA_APP_NAME: ${{ secrets.PWA_APP_NAME }}
-  PWA_BUNDLE_ID: ${{ secrets.PWA_BUNDLE_ID }}
-  PWA_LANGUAGE: ${{ secrets.PWA_LANGUAGE }}
-  PWA_ICON_PNG_BASE64: ${{ secrets.PWA_ICON_PNG_BASE64 }}
-  PWA_LOGO_PNG_BASE64: ${{ secrets.PWA_LOGO_PNG_BASE64 }}
-  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
 jobs:
-  simulator:
+  app:
     if: github.repository == 'DE0CH/pwa-shell-ios'
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [yyc-ai, jarvis4-chat]
+    environment: ${{ matrix.app }}
     runs-on: macos-26
-    timeout-minutes: 75
+    timeout-minutes: 130
+    env:
+      PWA_SITE_URL: ${{ secrets.PWA_SITE_URL }}
+      PWA_APP_NAME: ${{ secrets.PWA_APP_NAME }}
+      PWA_BUNDLE_ID: ${{ secrets.PWA_BUNDLE_ID }}
+      PWA_LANGUAGE: ${{ secrets.PWA_LANGUAGE }}
+      PWA_BACKEND: ${{ secrets.PWA_BACKEND }}
+      PWA_ICON_PNG_BASE64: ${{ secrets.PWA_ICON_PNG_BASE64 }}
+      PWA_ICON_PNG_BASE64_2: ${{ secrets.PWA_ICON_PNG_BASE64_2 }}
+      PWA_LOGO_PNG_BASE64: ${{ secrets.PWA_LOGO_PNG_BASE64 }}
+      PWA_LOGO_PNG_BASE64_2: ${{ secrets.PWA_LOGO_PNG_BASE64_2 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      UPLOAD: ${{ github.event_name == 'push' || inputs.upload }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Check the configuration
+        run: |
+          missing=0
+          for v in PWA_SITE_URL PWA_APP_NAME PWA_BUNDLE_ID APPLE_TEAM_ID; do
+            [[ -n "${!v}" ]] || { echo "::error::secret $v is not set"; missing=1; }
+          done
+          exit $missing
 
       - name: Mask the site's host
         run: |
@@ -81,46 +100,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: simulator-results-encrypted
+          name: simulator-results-encrypted-${{ matrix.app }}
           path: simulator-results.tar.age
           if-no-files-found: ignore
 
-  testflight:
-    needs: simulator
-    if: github.repository == 'DE0CH/pwa-shell-ios' && (github.event_name == 'push' || inputs.upload)
-    runs-on: macos-26
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check the configuration
-        run: |
-          missing=0
-          for v in PWA_SITE_URL PWA_APP_NAME PWA_BUNDLE_ID APPLE_TEAM_ID; do
-            [[ -n "${!v}" ]] || { echo "::error::secret $v is not set"; missing=1; }
-          done
-          exit $missing
-
-      - name: Mask the site's host
-        run: |
-          h=${PWA_SITE_URL#https://}; h=${h%%/*}
-          [[ -n "$h" ]] && echo "::add-mask::$h"
-          true
-
-      - name: Select Xcode 26
-        run: |
-          XCODE=$(ls -d /Applications/Xcode_26*.app | grep -v -i beta | sort -V | tail -1)
-          sudo xcode-select -s "$XCODE"
-          xcodebuild -version
-
-      - name: Generate the project
+      - name: Generate the project for the upload
+        if: env.UPLOAD == 'true'
         env:
           BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
-        run: |
-          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
-          scripts/configure.sh
+        run: scripts/configure.sh
 
       - name: Archive (unsigned)
+        if: env.UPLOAD == 'true'
         # Signing at archive time makes automatic signing mint a new Apple Development certificate on
         # every fresh runner. The archive stays unsigned; the export signs it with the cloud-managed
         # distribution certificate.
@@ -133,6 +124,7 @@ jobs:
           grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/archive.log"
 
       - name: Export, cloud-sign and upload to TestFlight
+        if: env.UPLOAD == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}

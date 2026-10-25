@@ -1,7 +1,8 @@
 import Foundation
 
-/// The server's REST API (DE0CH/claudecodeui, Jarvis staff mode). Every call carries the Access token as the
-/// CF_Authorization cookie; redirects are not followed, so an expired token shows up as `signedOut`.
+/// A server's REST API (DE0CH/claudecodeui in Jarvis mode, or Jarvis 4's router). Every call carries the endpoint's
+/// Access headers (the CF_Authorization cookie, or a service token's); redirects are not followed, so an expired
+/// token shows up as `signedOut`.
 final class API: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     enum Failure: LocalizedError {
         case signedOut, http(Int, String), decode
@@ -14,7 +15,7 @@ final class API: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         }
     }
 
-    var token: String
+    let endpoint: Endpoint
     private lazy var session: URLSession = {
         let c = URLSessionConfiguration.default
         c.httpShouldSetCookies = false
@@ -24,7 +25,7 @@ final class API: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         return URLSession(configuration: c, delegate: self, delegateQueue: nil)
     }()
 
-    init(token: String) { self.token = token }
+    init(_ endpoint: Endpoint) { self.endpoint = endpoint }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
@@ -32,9 +33,9 @@ final class API: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     }
 
     func request(_ path: String, method: String = "GET", json: Any? = nil) -> URLRequest {
-        var r = URLRequest(url: Config.url(path))
+        var r = URLRequest(url: endpoint.url(path))
         r.httpMethod = method
-        r.setValue("CF_Authorization=\(token)", forHTTPHeaderField: "Cookie")
+        for (k, v) in endpoint.headers { r.setValue(v, forHTTPHeaderField: k) }
         r.setValue("application/json", forHTTPHeaderField: "Accept")
         if let json {
             r.httpBody = try? JSONSerialization.data(withJSONObject: json)
@@ -48,6 +49,8 @@ final class API: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         let (data, resp) = try await session.data(for: r)
         guard let http = resp as? HTTPURLResponse else { throw Failure.decode }
         if http.statusCode == 401 || (300..<400).contains(http.statusCode) { throw Failure.signedOut }
+        // Access answers a request it refused with its own HTML page, not the server's JSON
+        if http.statusCode == 403, (http.value(forHTTPHeaderField: "Content-Type") ?? "").contains("text/html") { throw Failure.signedOut }
         if http.statusCode == 404 && allow404 { return (data, http) }
         if !(200..<300).contains(http.statusCode) {
             let j = try? JSONDecoder().decode(JSONValue.self, from: data)
@@ -197,11 +200,11 @@ final class API: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
     func shares(_ id: String) async throws -> [Share] {
         let v = try await json(request("/api/jarvis/sessions/\(id)/shares"))
-        return (v["shares"]?.array ?? []).compactMap(Self.share)
+        return (v["shares"]?.array ?? []).compactMap(share)
     }
 
     func createShare(_ id: String) async throws -> Share {
-        guard let s = Self.share(try await json(request("/api/jarvis/sessions/\(id)/shares", method: "POST", json: [:]))) else {
+        guard let s = share(try await json(request("/api/jarvis/sessions/\(id)/shares", method: "POST", json: [:]))) else {
             throw Failure.decode
         }
         return s
@@ -211,8 +214,8 @@ final class API: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         try await send(request("/api/jarvis/shares/\(shareId)", method: "DELETE"))
     }
 
-    static func share(_ v: JSONValue) -> Share? {
+    func share(_ v: JSONValue) -> Share? {
         guard let id = v["id"]?.string, let u = v["url"]?.string else { return nil }
-        return Share(id: id, url: Config.url(u), createdAt: date(v["createdAt"]?.string))
+        return Share(id: id, url: endpoint.url(u), createdAt: Self.date(v["createdAt"]?.string))
     }
 }

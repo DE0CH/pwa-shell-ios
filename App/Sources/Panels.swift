@@ -21,7 +21,7 @@ struct FilesPanel: View {
                     }
                 default:
                     if files.isEmpty {
-                        Text(model.selected == nil ? L("files.notStarted") : L("files.empty", Config.appName))
+                        Text(model.chatId == nil ? L("files.notStarted") : L("files.empty", Config.appName))
                             .foregroundStyle(.secondary).multilineTextAlignment(.center).padding(32)
                     } else {
                         List(files) { f in
@@ -58,7 +58,7 @@ struct FilesPanel: View {
     }
 
     private func load() async {
-        guard let api = model.api, let id = model.selected else { files = []; state = "done"; return }
+        guard let api = model.api, let id = model.chatId else { files = []; state = "done"; return }
         do { files = try await api.files(id); state = "done" } catch API.Failure.signedOut { model.signedOut() } catch { state = "error" }
     }
 }
@@ -110,12 +110,12 @@ struct ShareSheet: View {
     }
 
     private func load() async {
-        guard let api = model.api, let id = model.selected else { return }
+        guard let api = model.api, let id = model.chatId else { return }
         shares = (try? await api.shares(id)) ?? []
     }
 
     private func create() async {
-        guard let api = model.api, let id = model.selected else { return }
+        guard let api = model.api, let id = model.chatId else { return }
         creating = true
         defer { creating = false }
         do {

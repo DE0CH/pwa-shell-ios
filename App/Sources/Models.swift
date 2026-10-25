@@ -131,6 +131,12 @@ struct Conversation: Identifiable, Hashable {
     var lastActivity: Date?
     /// In Recently deleted: when the server deletes it for good.
     var purgeAt: Date?
+    /// Jarvis 4: the session's state (started, paused, …) and its server
+    var state: String?
+    var remote: URL?
+
+    /// A Jarvis 4 session that isn't running (nil: always available).
+    var paused: Bool { state != nil && state != "started" }
 }
 
 /// An attachment chosen in the composer, before sending.

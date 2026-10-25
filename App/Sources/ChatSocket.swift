@@ -10,22 +10,22 @@ final class ChatSocket: NSObject, URLSessionWebSocketDelegate {
     private(set) var connected = false
     private var task: URLSessionWebSocketTask?
     private var session: URLSession?
-    private var token: String
+    private let endpoint: Endpoint
     private var stopped = false
     private var generation = 0
 
-    init(token: String) { self.token = token }
+    init(_ endpoint: Endpoint) { self.endpoint = endpoint }
 
     func connect() {
         stopped = false
         generation += 1
         let gen = generation
-        var comps = URLComponents(url: Config.siteURL, resolvingAgainstBaseURL: false)!
+        var comps = URLComponents(url: endpoint.base, resolvingAgainstBaseURL: false)!
         comps.scheme = comps.scheme == "http" ? "ws" : "wss"
         comps.path = "/ws"
         comps.query = nil
         var r = URLRequest(url: comps.url!)
-        r.setValue("CF_Authorization=\(token)", forHTTPHeaderField: "Cookie")
+        for (k, v) in endpoint.headers { r.setValue(v, forHTTPHeaderField: k) }
         let s = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
         session = s
         let t = s.webSocketTask(with: r)

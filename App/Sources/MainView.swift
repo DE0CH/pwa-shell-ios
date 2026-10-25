@@ -2,7 +2,8 @@ import SwiftUI
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
-    @State private var compact: NavigationSplitViewColumn = .detail
+    // with no New chat (Jarvis 4) the app opens on the list: there is nothing to type into before a session is picked
+    @State private var compact: NavigationSplitViewColumn = Config.backend == "jarvis4" ? .sidebar : .detail
     @State private var renaming: Conversation?
     @State private var renameText = ""
     @State private var deleting: Conversation?
@@ -35,16 +36,18 @@ struct MainView: View {
 
     private var sidebar: some View {
         List {
-            Button {
-                model.newChat()
-                compact = .detail
-            } label: {
-                Label(L("chat.new"), systemImage: "square.and.pencil")
+            if model.features.newChat {
+                Button {
+                    model.newChat()
+                    compact = .detail
+                } label: {
+                    Label(L("chat.new"), systemImage: "square.and.pencil")
+                }
+                .accessibilityIdentifier("sidebar-new-chat")
             }
-            .accessibilityIdentifier("sidebar-new-chat")
-            Section(L("list.title")) {
+            Section(L(model.features.newChat ? "list.title" : "list.sessions")) {
                 if model.conversations.isEmpty {
-                    Text(L("list.empty")).foregroundStyle(.secondary)
+                    Text(L(model.features.newChat ? "list.empty" : "list.emptySessions")).foregroundStyle(.secondary)
                 }
                 ForEach(model.conversations) { c in
                     Button {
@@ -55,23 +58,29 @@ struct MainView: View {
                     }
                     .foregroundStyle(.primary)
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) { deleting = c } label: { Label(L("button.delete"), systemImage: "trash") }
-                        Button { renameText = c.title; renaming = c } label: { Label(L("menu.rename"), systemImage: "pencil") }
+                        if model.features.manage {
+                            Button(role: .destructive) { deleting = c } label: { Label(L("button.delete"), systemImage: "trash") }
+                            Button { renameText = c.title; renaming = c } label: { Label(L("menu.rename"), systemImage: "pencil") }
+                        }
                     }
                     .contextMenu {
-                        Button { renameText = c.title; renaming = c } label: { Label(L("menu.rename"), systemImage: "pencil") }
-                        Button(role: .destructive) { deleting = c } label: { Label(L("button.delete"), systemImage: "trash") }
+                        if model.features.manage {
+                            Button { renameText = c.title; renaming = c } label: { Label(L("menu.rename"), systemImage: "pencil") }
+                            Button(role: .destructive) { deleting = c } label: { Label(L("button.delete"), systemImage: "trash") }
+                        }
                     }
                 }
                 if model.hasMore {
                     Button(L("list.loadMore")) { model.loadMore() }
                 }
             }
-            Section {
-                NavigationLink {
-                    DeletedList()
-                } label: {
-                    Label(L("deleted.title"), systemImage: "trash")
+            if model.features.manage {
+                Section {
+                    NavigationLink {
+                        DeletedList()
+                    } label: {
+                        Label(L("deleted.title"), systemImage: "trash")
+                    }
                 }
             }
         }
@@ -88,11 +97,13 @@ struct ConversationRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "bubble.left").foregroundStyle(.secondary)
+            Image(systemName: c.paused ? "pause.circle" : "bubble.left").foregroundStyle(.secondary)
             Text(c.title.isEmpty ? L("list.unnamed") : c.title).lineLimit(1)
                 .fontWeight(selected ? .semibold : .regular)
             Spacer(minLength: 4)
-            if running { ProgressView().controlSize(.small) } else if let d = c.lastActivity {
+            if running { ProgressView().controlSize(.small) } else if c.paused {
+                Text(L("session.pausedShort")).font(.caption).foregroundStyle(.secondary)
+            } else if let d = c.lastActivity {
                 Text(Format.age(d)).font(.caption).foregroundStyle(.secondary)
             }
         }

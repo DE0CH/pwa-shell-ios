@@ -74,3 +74,11 @@
 "composer.camera" = "Take Photo";
 "composer.files" = "Choose Files";
 "composer.remove" = "Remove %@";
+"signin.messagePair" = "Pair this device with Jarvis 4 (your Cloudflare Access login). It lists your Claude Code · CloudCLI sessions.";
+"list.sessions" = "Sessions";
+"list.emptySessions" = "No Claude Code · CloudCLI sessions. Start one in the Jarvis 4 app.";
+"session.paused" = "This session is paused";
+"session.pausedHint" = "Resume starts its machine again with everything as it was.";
+"session.resume" = "Resume";
+"session.resuming" = "Resuming…";
+"session.pausedShort" = "paused";

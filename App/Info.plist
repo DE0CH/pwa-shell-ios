@@ -31,6 +31,8 @@
 	<true/>
 	<key>PWASiteURL</key>
 	<string>$(PWA_SITE_URL)</string>
+	<key>PWABackend</key>
+	<string>$(PWA_BACKEND)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

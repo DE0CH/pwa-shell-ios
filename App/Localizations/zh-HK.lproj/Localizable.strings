@@ -74,3 +74,11 @@
 "composer.camera" = "拍照";
 "composer.files" = "選擇檔案";
 "composer.remove" = "移除 %@";
+"signin.messagePair" = "以你的 Cloudflare Access 登入，將此裝置與 Jarvis 4 配對，即可看到你的 Claude Code · CloudCLI 工作階段。";
+"list.sessions" = "工作階段";
+"list.emptySessions" = "未有 Claude Code · CloudCLI 工作階段。請在 Jarvis 4 app 開一個。";
+"session.paused" = "此工作階段已暫停";
+"session.pausedHint" = "恢復後，機器會重新啟動，一切如前。";
+"session.resume" = "恢復";
+"session.resuming" = "正在恢復…";
+"session.pausedShort" = "已暫停";
