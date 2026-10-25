@@ -69,6 +69,10 @@ final class ShellUITests: XCTestCase {
             let page = NSPredicate(format: "label CONTAINS[c] 'Log in to' OR label CONTAINS[c] 'Send login code' OR label CONTAINS 'Google'")
             found = sheet.descendants(matching: .any).matching(page).firstMatch.waitForExistence(timeout: 45)
                 || sheet.textFields.firstMatch.exists || app.descendants(matching: .any).matching(page).firstMatch.exists
+            // Access's page can take longer than that on a CI runner: the sheet open on the site's host is the app's part
+            if !found, let host = ProcessInfo.processInfo.environment["PWA_SITE_HOST"], !host.isEmpty {
+                found = sheet.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", host)).firstMatch.exists
+            }
         } else {
             found = sheet.buttons.matching(google).firstMatch.waitForExistence(timeout: 45)
                 || sheet.links.matching(google).firstMatch.exists || app.buttons.matching(google).firstMatch.exists
