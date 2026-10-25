@@ -65,9 +65,10 @@ final class ShellUITests: XCTestCase {
         let google = NSPredicate(format: "label CONTAINS 'Google'")
         var found: Bool
         if jarvis4 {
-            // Deyao's Access login: an emailed code (an email field) or an identity provider's button
-            found = sheet.textFields.firstMatch.waitForExistence(timeout: 45) || sheet.buttons.matching(google).firstMatch.exists
-                || sheet.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Cloudflare' OR label CONTAINS[c] 'email'")).firstMatch.exists
+            // Deyao's Access login ("Log in to Jarvis 4": Google, Google Workspace, an emailed code)
+            let page = NSPredicate(format: "label CONTAINS[c] 'Log in to' OR label CONTAINS[c] 'Send login code' OR label CONTAINS 'Google'")
+            found = sheet.descendants(matching: .any).matching(page).firstMatch.waitForExistence(timeout: 45)
+                || sheet.textFields.firstMatch.exists || app.descendants(matching: .any).matching(page).firstMatch.exists
         } else {
             found = sheet.buttons.matching(google).firstMatch.waitForExistence(timeout: 45)
                 || sheet.links.matching(google).firstMatch.exists || app.buttons.matching(google).firstMatch.exists
@@ -186,7 +187,11 @@ final class ShellUITests: XCTestCase {
             XCTAssertFalse(app.textViews["composer-input"].exists || app.textFields["composer-input"].exists, "a paused session has no composer")
             keep("13-paused-session")
             resume.tap()
-            XCTAssertTrue(app.staticTexts["Decisions"].waitForExistence(timeout: 40), "the resumed session's conversation did not load")
+            // running again: the composer and the conversation (earlier tests made it long: the transcript, not one line)
+            let input = app.textViews["composer-input"].exists ? app.textViews["composer-input"] : app.textFields["composer-input"]
+            XCTAssertTrue(input.waitForExistence(timeout: 40) || app.textFields["composer-input"].exists, "the resumed session has no composer")
+            XCTAssertTrue(app.scrollViews["transcript"].waitForExistence(timeout: 15), "the resumed session's conversation did not load")
+            XCTAssertFalse(resume.exists)
             keep("14-resumed-session")
             return
         }
