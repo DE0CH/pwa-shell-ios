@@ -41,6 +41,7 @@ struct Composer: View {
                     .padding(.top, 6).padding(.trailing, 6)
                 }
             }
+            GlassGroup {
             HStack(alignment: .bottom, spacing: 8) {
                 Menu {
                     Button { showPhotos = true } label: { Label(L("composer.photos"), systemImage: "photo.on.rectangle") }
@@ -50,6 +51,7 @@ struct Composer: View {
                     Button { showFiles = true } label: { Label(L("composer.files"), systemImage: "folder") }
                 } label: {
                     Image(systemName: "paperclip").font(.title3).frame(width: 36, height: 36)
+                        .glassCircle()
                 }
                 .accessibilityLabel(L("composer.attach"))
                 .accessibilityIdentifier("attach-button")
@@ -58,22 +60,24 @@ struct Composer: View {
                     .lineLimit(1...8)
                     .focused($focused)
                     .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 18))
-                    .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.quaternary))
+                    .glassField()
                     .onChange(of: model.draft) { _, _ in model.draftChanged() }
                     .accessibilityIdentifier("composer-input")
 
                 if model.isBusy {
-                    Button { model.stop() } label: { Image(systemName: "stop.circle.fill").font(.title) }
+                    Button { model.stop() } label: { ActionSymbol(glass: "stop.fill", plain: "stop.circle.fill") }
+                        .glassAction()
                         .accessibilityLabel(L("button.stop"))
                 } else if model.sending {
                     ProgressView().frame(width: 36, height: 36)
                 } else {
-                    Button { model.send() } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
+                    Button { model.send() } label: { ActionSymbol(glass: "arrow.up", plain: "arrow.up.circle.fill") }
+                        .glassAction()
                         .disabled(!model.canSend)
                         .accessibilityLabel(L("button.send"))
                         .accessibilityIdentifier("send-button")
                 }
+            }
             }
         }
         .photosPicker(isPresented: $showPhotos, selection: $photoItems, maxSelectionCount: 10, matching: .any(of: [.images, .videos]))
@@ -149,5 +153,55 @@ struct CameraPicker: UIViewControllerRepresentable {
             done(info[.originalImage] as? UIImage)
         }
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { done(nil) }
+    }
+}
+
+// MARK: - Liquid Glass (iOS 26, as Messages' composer); earlier iOS keeps the plain field on the bar
+
+/// Lets the composer's glass shapes blend into each other.
+struct GlassGroup<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        if #available(iOS 26.0, *) { GlassEffectContainer(spacing: 8) { content } } else { content }
+    }
+}
+
+extension View {
+    /// The text field: a glass capsule-like shape.
+    @ViewBuilder func glassField() -> some View {
+        if #available(iOS 26.0, *) {
+            glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        } else {
+            background(.background, in: RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.quaternary))
+        }
+    }
+
+    /// The attach button: a glass circle.
+    @ViewBuilder func glassCircle() -> some View {
+        if #available(iOS 26.0, *) { glassEffect(.regular.interactive(), in: Circle()) } else { self }
+    }
+
+    /// Send and Stop: the system's prominent glass button, a circle.
+    @ViewBuilder func glassAction() -> some View {
+        if #available(iOS 26.0, *) { buttonStyle(.glassProminent).buttonBorderShape(.circle) } else { self }
+    }
+
+    /// The composer's backdrop: none on iOS 26 (the glass floats over the transcript), else the bar.
+    @ViewBuilder func composerBackdrop() -> some View {
+        if #available(iOS 26.0, *) { self } else { background(.bar) }
+    }
+}
+
+/// Send / Stop's symbol: bare inside the iOS 26 glass button, the filled circle before it.
+struct ActionSymbol: View {
+    var glass: String
+    var plain: String
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            Image(systemName: glass).font(.body.weight(.semibold)).frame(width: 22, height: 22)
+        } else {
+            Image(systemName: plain).font(.title)
+        }
     }
 }

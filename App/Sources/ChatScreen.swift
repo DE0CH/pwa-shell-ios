@@ -37,7 +37,7 @@ struct ChatScreen: View {
                 if model.canCompose { Composer() }
             }
             .padding(.horizontal, 12).padding(.bottom, 6).padding(.top, 4)
-            .background(.bar)
+            .composerBackdrop()
         }
         .navigationTitle(model.title)
         .navigationBarTitleDisplayMode(.inline)
