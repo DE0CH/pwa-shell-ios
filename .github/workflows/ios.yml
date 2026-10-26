@@ -2,8 +2,8 @@
 # the instance is in git), tests it on a simulator, then archives it unsigned, cloud-signs it with the App
 # Store Connect API key and uploads it to TestFlight. The upload waits for the simulator test.
 # Every app built from this code is a GitHub environment, so one push ships all of them, each on its own (one app's
-# failing test doesn't hold back another's upload): `yyc-ai` (the repository's own secrets) and `jarvis4-chat` (its
-# environment's PWA_* secrets override them; PWA_BACKEND jarvis4).
+# failing test doesn't hold back another's upload): `jarvis4-chat` (its environment's PWA_* secrets override the
+# repository's; PWA_BACKEND jarvis4). YYC AI is built from DE0CH/claudecodeui (its Paseo-based app).
 # The repository is public, so its logs and artifacts are too: logs never name the site (secrets are masked,
 # the app logs host classes only) and the simulator screenshots are age-encrypted to the recipient in the
 # secret PWA_ARTIFACT_AGE_RECIPIENT before upload.
@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [yyc-ai, jarvis4-chat]
+        app: [jarvis4-chat]
     environment: ${{ matrix.app }}
     runs-on: macos-26
     timeout-minutes: 130

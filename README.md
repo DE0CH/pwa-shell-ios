@@ -13,7 +13,8 @@ logo are build inputs, set as GitHub secrets and written into the project at bui
 Every screen is shared; `App/Sources/Backend.swift` decides only how the app signs in, where the conversation list
 comes from and which server each conversation is on (build input `PWA_BACKEND`):
 
-- **`server`** (default): one CloudCLI-fork server with its own conversation list (e.g. YYC AI). Everything below.
+- **`server`** (default): one CloudCLI-fork server with its own conversation list. Everything below. No app ships
+  with it now: YYC AI, its first user, is built from DE0CH/claudecodeui's Paseo-based app.
 - **`jarvis4`**: [Jarvis 4](https://github.com/DE0CH/jarvis4), whose `cloudcli` sessions each run the same fork on
   their own origin. The app pairs once with Jarvis 4 (`/api/devices/pair?app=jarvis4chat`, the person's Access login
   in the system sheet; the answer carries an Access service token for this device, kept in the Keychain), lists the
@@ -22,7 +23,7 @@ comes from and which server each conversation is on (build input `PWA_BACKEND`):
   (`POST /api/sessions/:id/start`).
 
 Each app built from this code is a GitHub environment of this repository, and every push builds, tests and uploads
-all of them: `yyc-ai` (the repository's own secrets) and `jarvis4-chat` (its environment's secrets override them).
+all of them: today only `jarvis4-chat` (its environment's secrets override the repository's).
 
 ## What the app does
 
@@ -57,7 +58,7 @@ all of them: `yyc-ai` (the repository's own secrets) and `jarvis4-chat` (its env
 | `PWA_ICON_PNG_BASE64` | app icon: an opaque 1024×1024 PNG, base64 (optional; a placeholder otherwise) |
 | `PWA_LOGO_PNG_BASE64` | logo on a transparent background for the sign-in and empty chat, base64 (optional) |
 | `PWA_ICON_PNG_BASE64_2`, `PWA_LOGO_PNG_BASE64_2` | the rest of a base64 value longer than a secret holds (48 KB), appended |
-| `PWA_BACKEND` | the kind of server: `server` (default: one CloudCLI-fork server, e.g. YYC AI) or `jarvis4` (see below) |
+| `PWA_BACKEND` | the kind of server: `server` (default: one CloudCLI-fork server) or `jarvis4` (see below) |
 | `APPLE_TEAM_ID` | Apple developer team id |
 | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY` | App Store Connect API key (Admin: cloud signing), `.p8` text |
 | `PWA_ARTIFACT_AGE_RECIPIENT` | an [age](https://age-encryption.org) public key: CI's screenshots show the site, and this repository's artifacts are public, so they are uploaded encrypted to it |
