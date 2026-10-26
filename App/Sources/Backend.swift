@@ -156,7 +156,8 @@ final class Jarvis4Backend: Backend {
             URLQueryItem(name: "app", value: "jarvis4chat"),
         ]
         let callback = try await sheet.callback(for: comps.url!, scheme: Config.signInScheme)
-        let c = try DeviceCredentials.from(callback, scheme: Config.signInScheme, state: state)
+        var c = try DeviceCredentials.from(callback, scheme: Config.signInScheme, state: state)
+        c.pairedAt = Date()
         c.save()
         creds = c
     }
@@ -174,7 +175,7 @@ final class Jarvis4Backend: Backend {
     func list(offset: Int) async throws -> (items: [Conversation], hasMore: Bool) {
         guard creds != nil else { throw API.Failure.signedOut }
         let api = API(Endpoint(base: Config.siteURL, headers: headers))
-        let v = try await api.json(api.request("/api/remotes?harness=cloudcli"))
+        let v = try await activated { try await api.json(api.request("/api/remotes?harness=cloudcli")) }
         let items = (v["sessions"]?.array ?? []).compactMap { s -> Conversation? in
             guard let id = s["id"]?.string else { return nil }
             var remote: URL?
@@ -183,6 +184,17 @@ final class Jarvis4Backend: Backend {
                                 state: s["state"]?.string, remote: remote ?? Self.origin(of: id))
         }
         return (items, false)
+    }
+
+    /// Cloudflare refuses a new service token for up to ~30 s after the router minted it, which looks like a sign-out:
+    /// while the token is that fresh, wait and ask again instead of throwing it away.
+    private func activated<T>(_ call: () async throws -> T) async throws -> T {
+        while true {
+            do { return try await call() } catch API.Failure.signedOut {
+                guard let at = creds?.pairedAt, Date().timeIntervalSince(at) < 90 else { throw API.Failure.signedOut }
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+        }
     }
 
     func endpoint(for conversation: Conversation?) -> Endpoint? {
@@ -221,6 +233,8 @@ struct DeviceCredentials: Codable {
     var id: String
     var clientId: String
     var clientSecret: String
+    /// When this device paired (nil for a token saved before this field existed).
+    var pairedAt: Date?
 
     static func from(_ url: URL, scheme: String, state: String) throws -> DeviceCredentials {
         guard url.scheme?.lowercased() == scheme.lowercased(), url.host == "paired",
