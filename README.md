@@ -1,5 +1,10 @@
 # pwa-shell-ios
 
+**Retired (2026-11-11): no app is built from this code any more.** Its last app, "Jarvis 4 Chat" (`PWA_BACKEND`
+`jarvis4`, Jarvis 4's `cloudcli` sessions), went with that harness: Jarvis 4's aviary harness uses YYC AI's own chat
+web app (aviary's pigeon, https://chat.deyaochen.com; DE0CH/jarvis4 aviary/README.md), and YYC AI's apps are built from
+DE0CH/claudecodeui. The workflow that built and uploaded it is removed; the code stays as it was.
+
 A native SwiftUI iPhone/iPad client for a **Jarvis** server (the staff build of
 [DE0CH/claudecodeui](https://github.com/DE0CH/claudecodeui): Claude Code in a sandbox per conversation) behind
 **Cloudflare Access**. All logic stays on the server; the app draws it natively with the same REST API and chat
